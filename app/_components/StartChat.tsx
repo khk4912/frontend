@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useSyncExternalStore } from 'react'
+import { useRef } from 'react'
 
 import ChatInputBox from './ChatInputBox'
 import type { ChatInputBoxHandle } from './ChatInputBox'
@@ -14,29 +14,8 @@ const promptSuggestions = [
   '교통사고 과실비율은 어떻게 결정되나요?',
 ]
 
-function getGreeting () {
-  const hour = new Date().getHours()
-  if (hour >= 0 && hour <= 4) return '늦은 밤이네요.'
-  if (hour >= 5 && hour <= 11) return '좋은 아침이에요.'
-  if (hour >= 12 && hour <= 17) return '좋은 오후예요.'
-  return '좋은 저녁이에요.'
-}
-
-function subscribeToGreeting () {
-  return () => {}
-}
-
-function getServerGreeting () {
-  return '안녕하세요.'
-}
-
 export default function StartChat () {
   const chatInputRef = useRef<ChatInputBoxHandle>(null)
-  const greeting = useSyncExternalStore(
-    subscribeToGreeting,
-    getGreeting,
-    getServerGreeting
-  )
 
   function handlePromptClick (prompt: string) {
     chatInputRef.current?.setMessage(prompt)
@@ -50,7 +29,7 @@ export default function StartChat () {
   return (
     <div className='mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-10 px-6 text-app-text'>
       <section className='flex flex-col items-start gap-1'>
-        <p className='text-app-muted'>{greeting}</p>
+        <p className='text-app-muted'>안녕하세요, 사용자님!</p>
         <h1 className='text-3xl font-bold'>무엇을 도와드릴까요?</h1>
       </section>
 
