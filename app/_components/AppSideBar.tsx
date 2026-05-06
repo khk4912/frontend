@@ -78,13 +78,16 @@ function SidebarContent ({
           collapsed ? 'flex-col items-center gap-2 px-0' : 'items-center gap-1'
         }`}
       >
-
-        <Image src='/logo.png' alt='Logo' width={40} height={40} />
+        <Link href='/'>
+          <Image src='/logo.png' alt='Logo' width={40} height={40} />
+        </Link>
 
         {!collapsed && (
-          <div className='min-w-0'>
-            <h2 className='truncate text-lg font-bold'>교톡</h2>
-          </div>
+          <Link href='/' className='min-w-0'>
+            <div className='min-w-0'>
+              <h2 className='text-lg font-bold truncate'>교톡</h2>
+            </div>
+          </Link>
         )}
 
         <button
@@ -112,8 +115,8 @@ function SidebarContent ({
       </Link>
 
       {!collapsed && (
-        <section className='min-h-0 flex-1'>
-          <div className='mb-2 px-2 text-xs font-medium text-app-subtle'>
+        <section className='flex-1 min-h-0'>
+          <div className='px-2 mb-2 text-xs font-medium text-app-subtle'>
             최근 대화
           </div>
           <ul className='space-y-1'>
@@ -157,7 +160,7 @@ export default function AppSidebar () {
           type='button'
           aria-label='사이드바 열기'
           onClick={openMobileSidebar}
-          className='fixed left-4 top-4 z-40 flex size-10 cursor-pointer items-center justify-center rounded-md border border-app-border bg-panel text-app-text shadow-lg transition-colors duration-200 hover:bg-surface-muted md:hidden'
+          className='fixed z-40 flex items-center justify-center transition-colors duration-200 border rounded-md shadow-lg cursor-pointer left-4 top-4 size-10 border-app-border bg-panel text-app-text hover:bg-surface-muted md:hidden'
         >
           <MenuIcon size={20} />
         </button>
