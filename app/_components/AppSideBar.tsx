@@ -9,14 +9,17 @@ import ThemeToggle from './ThemeToggle'
 const chats = [
   {
     title: '과실비율 질문',
+    href: '/chat/1',
     isActive: true,
   },
   {
     title: '합의금 계산 상담',
+    href: '/chat/2',
     isActive: false,
   },
   {
     title: '보험사 대응 문안',
+    href: '/chat/3',
     isActive: false,
   },
 ]
@@ -25,27 +28,29 @@ type ChatItemProps = {
   title: string
   summary?: string
   isActive?: boolean
+  href: string
 }
 
-function ChatItem ({ title, isActive = false }: ChatItemProps) {
+function ChatItem ({ title, isActive = false, href }: ChatItemProps) {
   return (
-    <li>
-      <button
-        type='button'
-        className={`
+    <Link href={href}>
+      <li>
+        <div
+          className={`
           flex w-full cursor-pointer items-center gap-3 rounded-md 
           px-3 py-2.5 text-left transition-colors duration-200 ${
           isActive
             ? 'bg-surface-muted text-app-text'
             : 'text-app-muted hover:bg-surface-muted hover:text-app-text'
         }`}
-      >
-        <span className='min-w-0'>
-          <span className='block text-sm font-medium truncate'>{title}</span>
-          {/* <span className='block text-xs truncate text-zinc-500'>{summary}</span> */}
-        </span>
-      </button>
-    </li>
+        >
+          <span className='min-w-0'>
+            <span className='block text-sm font-medium truncate'>{title}</span>
+            {/* <span className='block text-xs truncate text-zinc-500'>{summary}</span> */}
+          </span>
+        </div>
+      </li>
+    </Link>
   )
 }
 
@@ -115,6 +120,7 @@ function SidebarContent ({
             {chats.map((chat) => (
               <ChatItem
                 key={chat.title}
+                href={chat.href} // TODO: 채팅 상세 페이지 링크로 변경
                 title={chat.title}
                 isActive={chat.isActive}
               />
