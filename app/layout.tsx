@@ -1,11 +1,13 @@
 import type { Metadata } from 'next'
-import { Noto_Sans_KR as NotoSansKR } from 'next/font/google'
+import localFont from 'next/font/local'
 
 import './globals.css'
 import AppSidebar from './_components/AppSideBar'
 
-const NotoKR = NotoSansKR({
-  variable: '--font-noto-kr',
+const pretendard = localFont({
+  src: '../public/fonts/PretendardVariable.woff2',
+  display: 'swap',
+  weight: '100 900',
 })
 
 export const metadata: Metadata = {
@@ -22,7 +24,7 @@ export default function RootLayout ({
   return (
     <html
       lang='ko'
-      className={`${NotoKR.variable} h-full antialiased`}
+      className={`${pretendard.className} h-full antialiased`}
     >
       <body className='flex min-h-full'>
         <aside>
