@@ -11,7 +11,7 @@ function ToolButton ({ icon }: { icon: React.ReactNode }) {
 export function LLMChat ({ text }: { text: string }) {
   return (
     <div className='flex flex-col self-start py-2'>
-      <p>{text}</p>
+      <span className='whitespace-pre-line'>{text}</span>
       <div className='flex justify-start mt-2 -ml-2'>
         <ToolButton icon={<LucideCopy size={16} />} />
         <ToolButton icon={<Share2Icon size={16} />} />

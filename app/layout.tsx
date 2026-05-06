@@ -39,7 +39,7 @@ export default function RootLayout ({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className='flex min-h-full'>
+      <body className='flex h-full'>
         <aside>
           <AppSidebar />
         </aside>
