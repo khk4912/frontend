@@ -9,14 +9,14 @@ import PromptChip from './PromptChip'
 const promptSuggestions = [
   '과실비율이 뭔가요?',
   '합의금은 어떻게 정해지나요?',
-  '보험사가 합의를 거부하면 어떻게 하나요?',
-  '합의서 작성 시 주의할 점은?',
-  '경미한 사고도 신고해야 하나요?',
+  '우회전하던 차와 부딪혔는데 과실비율은 어떻게 되나요?',
+  '교통사고 합의금 계산 방법을 알려주세요.',
+  '교통사고 과실비율은 어떻게 결정되나요?',
 ]
 
 function getGreeting () {
   const hour = new Date().getHours()
-
+  if (hour >= 0 && hour <= 4) return '늦은 밤이네요.'
   if (hour >= 5 && hour <= 11) return '좋은 아침이에요.'
   if (hour >= 12 && hour <= 17) return '좋은 오후예요.'
   return '좋은 저녁이에요.'
@@ -48,13 +48,10 @@ export default function StartChat () {
   }
 
   return (
-    <div className='mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-10 px-6 text-white'>
+    <div className='mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-10 px-6 text-app-text'>
       <section className='flex flex-col items-start gap-1'>
-        <p className='text-zinc-400'>{greeting}</p>
+        <p className='text-app-muted'>{greeting}</p>
         <h1 className='text-3xl font-bold'>무엇을 도와드릴까요?</h1>
-        <p className='mt-1.5 text-sm text-zinc-500'>
-          교통사고 과실비율과 합의금, 법률 용어까지 쉽게 알려드려요.
-        </p>
       </section>
 
       <div className='flex flex-col gap-4'>

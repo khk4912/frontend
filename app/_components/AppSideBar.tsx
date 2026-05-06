@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { MenuIcon, PencilLine, X } from 'lucide-react'
 import { useState } from 'react'
 import Image from 'next/image'
+import ThemeToggle from './ThemeToggle'
 
 const chats = [
   {
@@ -35,8 +36,8 @@ function ChatItem ({ title, isActive = false }: ChatItemProps) {
           flex w-full cursor-pointer items-center gap-3 rounded-md 
           px-3 py-2.5 text-left transition-colors duration-200 ${
           isActive
-            ? 'bg-zinc-800 text-zinc-50'
-            : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
+            ? 'bg-surface-muted text-app-text'
+            : 'text-app-muted hover:bg-surface-muted hover:text-app-text'
         }`}
       >
         <span className='min-w-0'>
@@ -85,7 +86,7 @@ function SidebarContent ({
           type='button'
           aria-label={toggleLabel}
           onClick={onHeaderButtonClick}
-          className={`flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-colors duration-200 hover:bg-zinc-800 hover:text-zinc-100 ${
+          className={`flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-app-muted transition-colors duration-200 hover:bg-surface-muted hover:text-app-text ${
             collapsed ? '' : 'ml-auto'
           }`}
         >
@@ -97,8 +98,8 @@ function SidebarContent ({
         href='/'
         onClick={onNewChatClick}
         className={`mb-3 flex h-10 items-center w-full gap-2 px-3 text-sm font-semibold transition-colors duration-200
-                 hover:bg-zinc-800 hover:text-zinc-100 rounded-md
-                 ${collapsed ? 'text-zinc-400' : ''}`}
+                 hover:bg-surface-muted hover:text-app-text rounded-md
+                 ${collapsed ? 'text-app-muted' : ''}`}
         aria-label='새 채팅'
       >
         <PencilLine size={17} />
@@ -107,7 +108,7 @@ function SidebarContent ({
 
       {!collapsed && (
         <section className='min-h-0 flex-1'>
-          <div className='mb-2 px-2 text-xs font-medium text-zinc-500'>
+          <div className='mb-2 px-2 text-xs font-medium text-app-subtle'>
             최근 대화
           </div>
           <ul className='space-y-1'>
@@ -121,6 +122,8 @@ function SidebarContent ({
           </ul>
         </section>
       )}
+      {collapsed && <div className='flex-1' />}
+      <ThemeToggle />
     </>
   )
 }
@@ -148,7 +151,7 @@ export default function AppSidebar () {
           type='button'
           aria-label='사이드바 열기'
           onClick={openMobileSidebar}
-          className='fixed left-4 top-4 z-40 flex size-10 cursor-pointer items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-100 shadow-lg transition-colors duration-200 hover:bg-zinc-800 md:hidden'
+          className='fixed left-4 top-4 z-40 flex size-10 cursor-pointer items-center justify-center rounded-md border border-app-border bg-panel text-app-text shadow-lg transition-colors duration-200 hover:bg-surface-muted md:hidden'
         >
           <MenuIcon size={20} />
         </button>
@@ -159,12 +162,12 @@ export default function AppSidebar () {
           type='button'
           aria-label='사이드바 닫기'
           onClick={closeMobileSidebar}
-          className='fixed inset-0 z-40 cursor-default bg-zinc-950/70 md:hidden'
+          className='fixed inset-0 z-40 cursor-default bg-app-overlay md:hidden'
         />
       )}
 
       <nav
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden border-r border-zinc-800 bg-zinc-900 px-3 py-4 text-zinc-100 shadow-2xl transition-transform duration-200 ease-in-out md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden border-r border-app-border bg-panel px-3 py-4 text-app-text shadow-2xl transition-transform duration-200 ease-in-out md:hidden ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -178,7 +181,7 @@ export default function AppSidebar () {
       </nav>
 
       <nav
-        className={`hidden h-screen flex-col overflow-hidden border-r border-zinc-800 bg-zinc-900 px-3 py-4 text-zinc-100 transition-[width] duration-200 ease-in-out md:flex ${
+        className={`hidden h-screen flex-col overflow-hidden border-r border-app-border bg-panel px-3 py-4 text-app-text transition-[width] duration-200 ease-in-out md:flex ${
           collapsed ? 'w-16' : 'w-72'
         }`}
       >
