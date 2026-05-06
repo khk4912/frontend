@@ -32,6 +32,12 @@ export default function ChatInputBox ({
   function setMessage (message: string) {
     if (editorRef.current === null) return
 
+    if (normalizeMessage(message).length === 0) {
+      editorRef.current.textContent = ''
+      setDraft('')
+      return
+    }
+
     editorRef.current.textContent = message
     setDraft(message)
   }
@@ -63,6 +69,16 @@ export default function ChatInputBox ({
     handleSend()
   }
 
+  function handleBlur () {
+    const editor = editorRef.current
+    if (editor === null) return
+
+    if (normalizeMessage(editor.innerText).length > 0) return
+
+    editor.textContent = ''
+    setDraft('')
+  }
+
   useImperativeHandle(ref, () => ({
     setMessage,
     focus: focusEditor,
@@ -79,6 +95,7 @@ export default function ChatInputBox ({
         suppressContentEditableWarning
         onInput={(event) => setDraft(event.currentTarget.innerText)}
         onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
         className='min-h-10 max-h-40 flex-1 overflow-y-auto whitespace-pre-wrap break-words py-1.5 text-base leading-7 text-app-text outline-none empty:before:pointer-events-none empty:before:text-app-subtle empty:before:content-[attr(data-placeholder)]'
       />
       <button
