@@ -10,8 +10,11 @@ export function ChatView ({ children }: ChatViewProps) {
   }, [])
 
   return (
-    <div id='chat-container' className='flex flex-col flex-1 w-full max-w-3xl min-h-0 gap-10 px-6 py-10 mx-auto overflow-y-auto text-app-text'>
-      {children}
+    <div id='chat-container' className='flex flex-col flex-1 w-full min-h-0 gap-10 py-10 overflow-y-auto text-app-text'>
+      <div className='px-20 w-full flex flex-col gap-10'>
+        {children}
+      </div>
+
     </div>
   )
 }
