@@ -38,9 +38,23 @@ function getErrorMessage (error: unknown) {
   return '답변 생성 중 오류가 발생했습니다.'
 }
 
-function getStateAnswer (patch: unknown) {
-  if (typeof patch !== 'object' || patch === null) return null
+function getStatePatch (patch: unknown) {
+  const emptyPatch = {
+    answerText: null,
+    retrievedDocs: null,
+    citations: null
+  }
 
+  if (typeof patch !== 'object' || patch === null) return emptyPatch
+
+  return {
+    answerText: getStateAnswer(patch),
+    retrievedDocs: getStateRetrievedDocs(patch),
+    citations: getStateCitations(patch)
+  }
+}
+
+function getStateAnswer (patch: object) {
   if ('answer_text' in patch && typeof patch.answer_text === 'string') {
     return patch.answer_text
   }
@@ -55,15 +69,13 @@ function getStateAnswer (patch: unknown) {
   return null
 }
 
-function getStateRetrievedDocs (patch: unknown): RetrievedDoc[] | null {
-  if (typeof patch !== 'object' || patch === null) return null
+function getStateRetrievedDocs (patch: object): RetrievedDoc[] | null {
   if (!('retrieved_docs' in patch) || !Array.isArray(patch.retrieved_docs)) return null
 
   return patch.retrieved_docs.filter(isRetrievedDoc)
 }
 
-function getStateCitations (patch: unknown): Citation[] | null {
-  if (typeof patch !== 'object' || patch === null) return null
+function getStateCitations (patch: object): Citation[] | null {
   if (!('citations' in patch) || !Array.isArray(patch.citations)) return null
 
   return patch.citations.filter(isCitation)
@@ -133,6 +145,38 @@ function getProgressNode (node: string | undefined): ChatProgressNode | undefine
   return undefined
 }
 
+function recoverInterruptedAssistantSession (
+  session: ChatSession,
+  activeAssistantMessageId: string | null
+) {
+  const lastMessage = session.messages.at(-1)
+
+  if (
+    lastMessage?.role !== 'assistant' ||
+    lastMessage.id === activeAssistantMessageId ||
+    lastMessage.status !== 'streaming' ||
+    lastMessage.content.trim().length > 0
+  ) {
+    return session
+  }
+
+  return updateSessionTimestamp({
+    ...session,
+    messages: session.messages.map((message) => (
+      message.id === lastMessage.id
+        ? {
+            ...message,
+            content: '답변이 중단되었습니다. 다시 시도해주세요.',
+            status: 'error',
+            progressNode: undefined,
+            progressLabel: undefined,
+            error: '답변이 중단되었습니다. 다시 시도해주세요.'
+          }
+        : message
+    ))
+  })
+}
+
 export default function ChatPage () {
   const params = useParams<{ id: string }>()
   const sessionId = params.id
@@ -143,6 +187,7 @@ export default function ChatPage () {
   )
   const [isStreaming, setIsStreaming] = useState(false)
   const streamedMessageIdsRef = useRef<Set<string>>(new Set())
+  const activeAssistantMessageIdRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const persistSession = useCallback((nextSession: ChatSession) => {
@@ -186,11 +231,12 @@ export default function ChatPage () {
 
     if (sessionBeforeRequest === undefined) return
 
+    activeAssistantMessageIdRef.current = assistantMessage.id
+    setIsStreaming(true)
     persistSession(updateSessionTimestamp({
       ...sessionBeforeRequest,
       messages: [...requestMessages, assistantMessage]
     }))
-    setIsStreaming(true)
     abortControllerRef.current = abortController
 
     try {
@@ -225,17 +271,19 @@ export default function ChatPage () {
               progressLabel: undefined,
               error: event.data.message ?? '답변 생성 중 오류가 발생했습니다.'
             }))
+            activeAssistantMessageIdRef.current = null
           }
 
           if (event.type === 'state') {
-            const stateAnswer = getStateAnswer(event.data.patch)
-            const retrievedDocs = getStateRetrievedDocs(event.data.patch)
-            const citations = getStateCitations(event.data.patch)
+            const statePatch = getStatePatch(event.data.patch)
+            const answerText = statePatch.answerText
+            const retrievedDocs = statePatch.retrievedDocs
+            const citations = statePatch.citations
 
-            if (stateAnswer !== null) {
+            if (answerText !== null) {
               updateAssistantMessage(assistantMessage.id, (message) => ({
                 ...message,
-                content: stateAnswer
+                content: answerText
               }))
             }
 
@@ -261,6 +309,7 @@ export default function ChatPage () {
               progressNode: undefined,
               progressLabel: undefined
             }))
+            activeAssistantMessageIdRef.current = null
           }
         }
       })
@@ -279,6 +328,7 @@ export default function ChatPage () {
       }))
     } finally {
       if (!abortController.signal.aborted) {
+        activeAssistantMessageIdRef.current = null
         setIsStreaming(false)
       }
     }
@@ -289,6 +339,22 @@ export default function ChatPage () {
       abortControllerRef.current?.abort()
     }
   }, [])
+
+  useEffect(() => {
+    if (session === null) return
+
+    const recoveredSession = recoverInterruptedAssistantSession(
+      session,
+      activeAssistantMessageIdRef.current
+    )
+    if (recoveredSession === session) return
+
+    const timeoutId = window.setTimeout(() => {
+      saveChatSession(recoveredSession)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [session])
 
   useEffect(() => {
     if (session === null || isStreaming) return
