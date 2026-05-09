@@ -95,3 +95,83 @@
   --button-disabled-text: #71717a;
   --overlay: rgb(9 9 11 / 70%);
 }
+
+@keyframes chat-progress-dot-pulse {
+  0% {
+    opacity: 40%;
+    transform: scale(0.86);
+  }
+
+  50% {
+    opacity: 100%;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 40%;
+    transform: scale(0.86);
+  }
+}
+
+@keyframes chat-progress-status-sheen {
+  0% {
+    background-position: 120% 50%;
+  }
+
+  100% {
+    background-position: -120% 50%;
+  }
+}
+
+.chat-progress-status {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.chat-progress-status > span:last-child {
+  width: fit-content;
+  max-width: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    var(--text-muted) 38%,
+    var(--text) 50%,
+    var(--text-muted) 62%,
+    var(--text-muted) 100%
+  );
+  background-size: 220% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: chat-progress-status-sheen 2.4s ease-in-out infinite;
+}
+
+.chat-progress-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: none;
+  border-radius: 9999px;
+  background: var(--text-muted);
+  animation: chat-progress-dot-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-progress-status > span:last-child,
+  .chat-progress-dot {
+    background: none;
+    animation: none;
+  }
+
+  .chat-progress-status > span:last-child {
+    color: var(--text-muted);
+  }
+
+  .chat-progress-dot {
+    background: var(--text-muted);
+  }
+}

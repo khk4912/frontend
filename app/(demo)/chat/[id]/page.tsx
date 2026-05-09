@@ -9,7 +9,7 @@ import {
   subscribeChatSessions,
   toBackendHistory,
 } from '@/app/_lib/chat'
-import type { ChatMessage, ChatSession, ChatStreamEvent } from '@/app/_lib/chat'
+import type { ChatMessage, ChatProgressNode, ChatSession, ChatStreamEvent } from '@/app/_lib/chat'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -46,6 +46,42 @@ function getStateAnswer (patch: unknown) {
   }
 
   return null
+}
+
+function getProgressLabel (node: string | undefined) {
+  const labels: Record<ChatProgressNode, string> = {
+    classify: '상황을 파악하는 중...',
+    clarify: '추가 확인이 필요한지 살피는 중...',
+    retrieve: '관련 문서를 검색하는 중...',
+    guide: '대응 절차를 정리하는 중...',
+    settlement: '합의금 단서를 확인하는 중...',
+    generate: '답변을 작성하는 중...',
+    post_check: '답변을 검토하는 중...',
+    fallback: '안내 가능한 범위를 확인하는 중...'
+  }
+
+  if (node !== undefined && node in labels) {
+    return labels[node as ChatProgressNode]
+  }
+
+  return '답변을 준비하는 중...'
+}
+
+function getProgressNode (node: string | undefined): ChatProgressNode | undefined {
+  if (
+    node === 'classify' ||
+    node === 'clarify' ||
+    node === 'retrieve' ||
+    node === 'guide' ||
+    node === 'settlement' ||
+    node === 'generate' ||
+    node === 'post_check' ||
+    node === 'fallback'
+  ) {
+    return node
+  }
+
+  return undefined
 }
 
 export default function ChatPage () {
@@ -92,7 +128,11 @@ export default function ChatPage () {
     abortControllerRef.current?.abort()
 
     const abortController = new AbortController()
-    const assistantMessage = createChatMessage('assistant', '', 'streaming')
+    const assistantMessage: ChatMessage = {
+      ...createChatMessage('assistant', '', 'streaming'),
+      progressNode: 'classify',
+      progressLabel: getProgressLabel('classify')
+    }
     const sessionBeforeRequest = getChatSession(sessionId)
 
     if (sessionBeforeRequest === undefined) return
@@ -113,6 +153,14 @@ export default function ChatPage () {
         ),
         signal: abortController.signal,
         onEvent: (event: ChatStreamEvent) => {
+          if (event.type === 'meta' && event.data.phase === 'start') {
+            updateAssistantMessage(assistantMessage.id, (message) => ({
+              ...message,
+              progressNode: getProgressNode(event.data.node),
+              progressLabel: getProgressLabel(event.data.node)
+            }))
+          }
+
           if (event.type === 'token') {
             updateAssistantMessage(assistantMessage.id, (message) => ({
               ...message,
@@ -124,6 +172,8 @@ export default function ChatPage () {
             updateAssistantMessage(assistantMessage.id, (message) => ({
               ...message,
               status: 'error',
+              progressNode: undefined,
+              progressLabel: undefined,
               error: event.data.message ?? '답변 생성 중 오류가 발생했습니다.'
             }))
           }
@@ -142,7 +192,9 @@ export default function ChatPage () {
           if (event.type === 'done') {
             updateAssistantMessage(assistantMessage.id, (message) => ({
               ...message,
-              status: undefined
+              status: undefined,
+              progressNode: undefined,
+              progressLabel: undefined
             }))
           }
         }
@@ -156,6 +208,8 @@ export default function ChatPage () {
         ...currentMessage,
         content: currentMessage.content.length > 0 ? currentMessage.content : message,
         status: 'error',
+        progressNode: undefined,
+        progressLabel: undefined,
         error: message
       }))
     } finally {
@@ -253,6 +307,7 @@ export default function ChatPage () {
                 text={message.content}
                 isStreaming={message.status === 'streaming'}
                 isError={message.status === 'error'}
+                progressLabel={message.progressLabel}
                 onRetry={() => handleRetry(message)}
               />
               )

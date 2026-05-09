@@ -2,12 +2,24 @@ export type ChatRole = 'user' | 'assistant'
 
 export type ChatMessageStatus = 'streaming' | 'error'
 
+export type ChatProgressNode =
+  | 'classify'
+  | 'clarify'
+  | 'retrieve'
+  | 'guide'
+  | 'settlement'
+  | 'generate'
+  | 'post_check'
+  | 'fallback'
+
 export type ChatMessage = {
   id: string
   role: ChatRole
   content: string
   createdAt: string
   status?: ChatMessageStatus
+  progressNode?: ChatProgressNode
+  progressLabel?: string
   error?: string
 }
 
