@@ -1,10 +1,18 @@
+'use client'
+
 import type { Citation, RetrievedDoc } from '@/app/_lib/chat'
 import { LucideCopy, RefreshCwIcon, Share2Icon } from 'lucide-react'
-import { useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { defaultUrlTransform } from 'react-markdown'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+
+const CITATION_TOOLTIP_WIDTH = 320
+const CITATION_TOOLTIP_GAP = 8
+const CITATION_TOOLTIP_MARGIN = 12
+const CITATION_TOOLTIP_EXIT_MS = 200
 
 function ToolButton ({
   icon,
@@ -76,30 +84,132 @@ function markCitationPreviews (
 }
 
 function CitationPreview ({ markerIdx, doc }: ReferencedDoc) {
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const tooltipRef = useRef<HTMLSpanElement>(null)
+  const closeTimeoutRef = useRef<number | null>(null)
+  const openFrameRef = useRef<number | null>(null)
+  const [isPreviewMounted, setIsPreviewMounted] = useState(false)
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false)
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 })
+
+  useLayoutEffect(() => {
+    if (!isPreviewMounted) return
+
+    function updateTooltipPosition () {
+      const button = buttonRef.current
+      const tooltip = tooltipRef.current
+
+      if (button === null || tooltip === null) return
+
+      const buttonRect = button.getBoundingClientRect()
+      const tooltipRect = tooltip.getBoundingClientRect()
+      const tooltipWidth = Math.min(CITATION_TOOLTIP_WIDTH, window.innerWidth - CITATION_TOOLTIP_MARGIN * 2)
+      const preferredLeft = buttonRect.left + buttonRect.width / 2 - tooltipWidth / 2
+      const left = Math.min(
+        Math.max(CITATION_TOOLTIP_MARGIN, preferredLeft),
+        window.innerWidth - tooltipWidth - CITATION_TOOLTIP_MARGIN
+      )
+      const topAbove = buttonRect.top - tooltipRect.height - CITATION_TOOLTIP_GAP
+      const topBelow = buttonRect.bottom + CITATION_TOOLTIP_GAP
+      const top = topAbove >= CITATION_TOOLTIP_MARGIN ? topAbove : topBelow
+
+      setTooltipPosition({ top, left })
+    }
+
+    updateTooltipPosition()
+    window.addEventListener('resize', updateTooltipPosition)
+    window.addEventListener('scroll', updateTooltipPosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updateTooltipPosition)
+      window.removeEventListener('scroll', updateTooltipPosition, true)
+    }
+  }, [isPreviewMounted])
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current !== null) {
+        window.clearTimeout(closeTimeoutRef.current)
+      }
+
+      if (openFrameRef.current !== null) {
+        window.cancelAnimationFrame(openFrameRef.current)
+      }
+    }
+  }, [])
+
+  function openPreview () {
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current)
+      closeTimeoutRef.current = null
+    }
+
+    if (openFrameRef.current !== null) {
+      window.cancelAnimationFrame(openFrameRef.current)
+    }
+
+    setIsPreviewMounted(true)
+    openFrameRef.current = window.requestAnimationFrame(() => {
+      openFrameRef.current = window.requestAnimationFrame(() => {
+        setIsPreviewVisible(true)
+        openFrameRef.current = null
+      })
+    })
+  }
+
+  function closePreview () {
+    if (openFrameRef.current !== null) {
+      window.cancelAnimationFrame(openFrameRef.current)
+      openFrameRef.current = null
+    }
+
+    setIsPreviewVisible(false)
+
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setIsPreviewMounted(false)
+      closeTimeoutRef.current = null
+    }, CITATION_TOOLTIP_EXIT_MS)
+  }
+
   return (
-    <span className='group relative inline-flex align-baseline'>
+    <span className='inline-flex align-baseline rounded-4xl'>
       <button
+        ref={buttonRef}
         type='button'
-        className='mx-0.5 inline-flex translate-y-[-1px] items-center rounded bg-blue-500/10 px-1.5 py-0.5 text-xs font-semibold text-blue-600 transition-colors duration-200 hover:bg-blue-500/15 focus-visible:bg-blue-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:text-blue-300'
+        onMouseEnter={openPreview}
+        onMouseLeave={closePreview}
+        onFocus={openPreview}
+        onBlur={closePreview}
+        className='mx-0.5 inline-flex -translate-y-px items-center rounded bg-blue-500/10 px-0.5 py-0.5 text-xs font-semibold text-blue-600 transition-colors duration-200 hover:bg-blue-500/15 focus-visible:bg-blue-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:text-blue-300 cursor-pointer'
         aria-label={`참고 문서 ${markerIdx}: ${doc.title}`}
       >
         [{markerIdx}]
       </button>
-      <span className='pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-80 max-w-[calc(100vw-3rem)] -translate-x-1/2 rounded-md border border-app-border bg-panel p-3 text-left text-sm leading-6 text-app-text shadow-xl group-focus-within:block group-hover:block'>
-        <span className='mb-1 flex items-center gap-2'>
-          <span className='rounded bg-blue-500/10 px-1.5 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-300'>
-            [{markerIdx}]
+      {isPreviewMounted && createPortal(
+        <span
+          ref={tooltipRef}
+          className={`pointer-events-none fixed w-80 max-w-[calc(100vw-3rem)] rounded-md border border-app-border bg-panel p-3 text-left text-sm leading-6 text-app-text shadow-xl transition-opacity duration-200 ease-out will-change-[opacity] ${
+            isPreviewVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          style={{
+            top: tooltipPosition.top,
+            left: tooltipPosition.left,
+            zIndex: 1000,
+          }}
+        >
+          <span className='mb-1 flex items-center gap-2'>
+            <span className='rounded bg-surface-muted px-1.5 py-0.5 text-xs text-app-muted'>
+              {doc.type}
+            </span>
           </span>
-          <span className='rounded bg-surface-muted px-1.5 py-0.5 text-xs text-app-muted'>
-            {doc.type}
+          <span className='block font-semibold text-app-text'>{doc.title}</span>
+          <span className='mt-1 block text-app-muted leading-[1.3]'>{doc.content}</span>
+          <span className='mt-2 block text-xs text-app-subtle font-base'>
+            유사도 {doc.score.toFixed(3)}
           </span>
-        </span>
-        <span className='block font-semibold text-app-text'>{doc.title}</span>
-        <span className='mt-1 block text-app-muted'>{doc.content}</span>
-        <span className='mt-2 block text-xs text-app-subtle'>
-          유사도 {doc.score.toFixed(3)}
-        </span>
-      </span>
+        </span>,
+        document.body
+      )}
     </span>
   )
 }
@@ -194,7 +304,7 @@ export function LLMChat ({
           <ProgressStatus label={statusText} />
           )
         : (
-          <div className={`break-words ${isError ? 'text-red-500' : ''}`}>
+          <div className={`wrap-break-word ${isError ? 'text-red-500' : ''}`}>
             {hasText
               ? (
                 <ReactMarkdown
