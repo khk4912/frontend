@@ -25,6 +25,9 @@ import { ChatView } from './_components/ChatView'
 import { LLMChat } from './_components/LLMChat'
 import { UserChat } from './_components/UserChat'
 
+const CHAT_STREAM_TIMEOUT_MS = 10000
+const CHAT_STREAM_TIMEOUT_MESSAGE = '응답 시간이 초과되었습니다. 다시 시도해주세요.'
+
 function updateSessionTimestamp (session: ChatSession): ChatSession {
   return {
     ...session,
@@ -118,7 +121,7 @@ function getProgressLabel (node: string | undefined) {
     settlement: '합의금 단서를 확인하는 중...',
     generate: '답변을 작성하는 중...',
     post_check: '답변을 검토하는 중...',
-    fallback: '안내 가능한 범위를 확인하는 중...'
+    fallback: '생각 중...'
   }
 
   if (node !== undefined && node in labels) {
@@ -186,7 +189,7 @@ export default function ChatPage () {
     () => null
   )
   const [isStreaming, setIsStreaming] = useState(false)
-  const streamedMessageIdsRef = useRef<Set<string>>(new Set())
+  const activeUserMessageIdRef = useRef<string | null>(null)
   const activeAssistantMessageIdRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -216,12 +219,16 @@ export default function ChatPage () {
     userMessage: ChatMessage,
     requestMessages: ChatMessage[]
   ) => {
-    if (streamedMessageIdsRef.current.has(userMessage.id)) return
+    if (activeUserMessageIdRef.current !== null) return
 
-    streamedMessageIdsRef.current.add(userMessage.id)
     abortControllerRef.current?.abort()
 
     const abortController = new AbortController()
+    let didTimeout = false
+    const timeoutId = window.setTimeout(() => {
+      didTimeout = true
+      abortController.abort()
+    }, CHAT_STREAM_TIMEOUT_MS)
     const assistantMessage: ChatMessage = {
       ...createChatMessage('assistant', '', 'streaming'),
       progressNode: 'classify',
@@ -229,8 +236,12 @@ export default function ChatPage () {
     }
     const sessionBeforeRequest = getChatSession(sessionId)
 
-    if (sessionBeforeRequest === undefined) return
+    if (sessionBeforeRequest === undefined) {
+      window.clearTimeout(timeoutId)
+      return
+    }
 
+    activeUserMessageIdRef.current = userMessage.id
     activeAssistantMessageIdRef.current = assistantMessage.id
     setIsStreaming(true)
     persistSession(updateSessionTimestamp({
@@ -271,6 +282,7 @@ export default function ChatPage () {
               progressLabel: undefined,
               error: event.data.message ?? '답변 생성 중 오류가 발생했습니다.'
             }))
+            activeUserMessageIdRef.current = null
             activeAssistantMessageIdRef.current = null
           }
 
@@ -309,25 +321,33 @@ export default function ChatPage () {
               progressNode: undefined,
               progressLabel: undefined
             }))
+            activeUserMessageIdRef.current = null
             activeAssistantMessageIdRef.current = null
           }
         }
       })
     } catch (error) {
-      if (abortController.signal.aborted) return
+      if (abortController.signal.aborted && !didTimeout) return
 
-      const message = getErrorMessage(error)
+      const message = didTimeout
+        ? CHAT_STREAM_TIMEOUT_MESSAGE
+        : getErrorMessage(error)
 
       updateAssistantMessage(assistantMessage.id, (currentMessage) => ({
         ...currentMessage,
-        content: currentMessage.content.length > 0 ? currentMessage.content : message,
+        content: currentMessage.content.length > 0 && !didTimeout
+          ? currentMessage.content
+          : message,
         status: 'error',
         progressNode: undefined,
         progressLabel: undefined,
         error: message
       }))
     } finally {
-      if (!abortController.signal.aborted) {
+      window.clearTimeout(timeoutId)
+
+      if (!abortController.signal.aborted || didTimeout) {
+        activeUserMessageIdRef.current = null
         activeAssistantMessageIdRef.current = null
         setIsStreaming(false)
       }
@@ -337,6 +357,8 @@ export default function ChatPage () {
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort()
+      activeUserMessageIdRef.current = null
+      activeAssistantMessageIdRef.current = null
     }
   }, [])
 
@@ -371,7 +393,11 @@ export default function ChatPage () {
   }, [isStreaming, session, startAssistantResponse])
 
   function handleSend (message: string) {
-    if (session === null || isStreaming) return
+    if (
+      session === null ||
+      isStreaming ||
+      activeUserMessageIdRef.current !== null
+    ) return
 
     const userMessage = createChatMessage('user', message)
     const nextSession = updateSessionTimestamp({
@@ -384,7 +410,11 @@ export default function ChatPage () {
   }
 
   function handleRetry (assistantMessage: ChatMessage) {
-    if (session === null || isStreaming) return
+    if (
+      session === null ||
+      isStreaming ||
+      activeUserMessageIdRef.current !== null
+    ) return
 
     const assistantIndex = session.messages.findIndex((message) => (
       message.id === assistantMessage.id
@@ -395,8 +425,6 @@ export default function ChatPage () {
       .find((message) => message.role === 'user')
 
     if (previousUserMessage === undefined) return
-
-    streamedMessageIdsRef.current.delete(previousUserMessage.id)
 
     const requestMessages = session.messages
       .slice(0, assistantIndex)
