@@ -7,7 +7,7 @@ import { LLMChat } from './_components/LLMChat'
 
 export default function ChatPage () {
   return (
-    <main className='flex flex-col flex-1 overflow-hidden text-app-text'>
+    <main className='flex flex-col flex-1 overflow-hidden text-app-text bg-app-bg'>
       <ChatView>
         <UserChat text='안녕?' />
         <LLMChat text='안녕하세요! 무엇을 도와드릴까요?' />
