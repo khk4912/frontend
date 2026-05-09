@@ -1,7 +1,9 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useRef } from 'react'
 
+import { createChatSession, saveChatSession } from '../_lib/chat'
 import ChatInputBox from './ChatInputBox'
 import type { ChatInputBoxHandle } from './ChatInputBox'
 import PromptChip from './PromptChip'
@@ -15,6 +17,7 @@ const promptSuggestions = [
 ]
 
 export default function StartChat () {
+  const router = useRouter()
   const chatInputRef = useRef<ChatInputBoxHandle>(null)
 
   function handlePromptClick (prompt: string) {
@@ -23,7 +26,10 @@ export default function StartChat () {
   }
 
   function handleSend (message: string) {
-    return message
+    const session = createChatSession(message)
+
+    saveChatSession(session)
+    router.push(`/chat/${session.id}`)
   }
 
   return (
