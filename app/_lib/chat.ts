@@ -12,6 +12,21 @@ export type ChatProgressNode =
   | 'post_check'
   | 'fallback'
 
+export type RetrievedDoc = {
+  doc_id: string
+  type: '법령' | '판례' | '사례'
+  title: string
+  content: string
+  case_types: string[]
+  score: number
+  settlement_amount: number | null
+}
+
+export type Citation = {
+  marker_idx: number
+  doc_id: string
+}
+
 export type ChatMessage = {
   id: string
   role: ChatRole
@@ -20,6 +35,8 @@ export type ChatMessage = {
   status?: ChatMessageStatus
   progressNode?: ChatProgressNode
   progressLabel?: string
+  retrievedDocs?: RetrievedDoc[]
+  citations?: Citation[]
   error?: string
 }
 

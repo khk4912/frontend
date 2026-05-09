@@ -9,7 +9,14 @@ import {
   subscribeChatSessions,
   toBackendHistory,
 } from '@/app/_lib/chat'
-import type { ChatMessage, ChatProgressNode, ChatSession, ChatStreamEvent } from '@/app/_lib/chat'
+import type {
+  ChatMessage,
+  ChatProgressNode,
+  ChatSession,
+  ChatStreamEvent,
+  Citation,
+  RetrievedDoc
+} from '@/app/_lib/chat'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -46,6 +53,48 @@ function getStateAnswer (patch: unknown) {
   }
 
   return null
+}
+
+function getStateRetrievedDocs (patch: unknown): RetrievedDoc[] | null {
+  if (typeof patch !== 'object' || patch === null) return null
+  if (!('retrieved_docs' in patch) || !Array.isArray(patch.retrieved_docs)) return null
+
+  return patch.retrieved_docs.filter(isRetrievedDoc)
+}
+
+function getStateCitations (patch: unknown): Citation[] | null {
+  if (typeof patch !== 'object' || patch === null) return null
+  if (!('citations' in patch) || !Array.isArray(patch.citations)) return null
+
+  return patch.citations.filter(isCitation)
+}
+
+function isRetrievedDoc (value: unknown): value is RetrievedDoc {
+  if (typeof value !== 'object' || value === null) return false
+
+  const candidate = value as Partial<RetrievedDoc>
+
+  return (
+    typeof candidate.doc_id === 'string' &&
+    (candidate.type === '법령' || candidate.type === '판례' || candidate.type === '사례') &&
+    typeof candidate.title === 'string' &&
+    typeof candidate.content === 'string' &&
+    Array.isArray(candidate.case_types) &&
+    candidate.case_types.every((item) => typeof item === 'string') &&
+    typeof candidate.score === 'number' &&
+    (typeof candidate.settlement_amount === 'number' || candidate.settlement_amount === null)
+  )
+}
+
+function isCitation (value: unknown): value is Citation {
+  if (typeof value !== 'object' || value === null) return false
+
+  const candidate = value as Partial<Citation>
+
+  return (
+    typeof candidate.marker_idx === 'number' &&
+    typeof candidate.doc_id === 'string'
+  )
 }
 
 function getProgressLabel (node: string | undefined) {
@@ -180,11 +229,27 @@ export default function ChatPage () {
 
           if (event.type === 'state') {
             const stateAnswer = getStateAnswer(event.data.patch)
+            const retrievedDocs = getStateRetrievedDocs(event.data.patch)
+            const citations = getStateCitations(event.data.patch)
 
             if (stateAnswer !== null) {
               updateAssistantMessage(assistantMessage.id, (message) => ({
                 ...message,
                 content: stateAnswer
+              }))
+            }
+
+            if (retrievedDocs !== null) {
+              updateAssistantMessage(assistantMessage.id, (message) => ({
+                ...message,
+                retrievedDocs
+              }))
+            }
+
+            if (citations !== null) {
+              updateAssistantMessage(assistantMessage.id, (message) => ({
+                ...message,
+                citations
               }))
             }
           }
@@ -308,6 +373,8 @@ export default function ChatPage () {
                 isStreaming={message.status === 'streaming'}
                 isError={message.status === 'error'}
                 progressLabel={message.progressLabel}
+                retrievedDocs={message.retrievedDocs}
+                citations={message.citations}
                 onRetry={() => handleRetry(message)}
               />
               )
