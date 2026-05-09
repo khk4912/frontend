@@ -2,39 +2,24 @@
 
 import Link from 'next/link'
 import { MenuIcon, PencilLine, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import ThemeToggle from './ThemeToggle'
+import { usePathname } from 'next/navigation'
 
-const chats = [
-  {
-    title: '과실비율 질문',
-    href: '/chat/1',
-    isActive: true,
-  },
-  {
-    title: '합의금 계산 상담',
-    href: '/chat/2',
-    isActive: false,
-  },
-  {
-    title: '보험사 대응 문안',
-    href: '/chat/3',
-    isActive: false,
-  },
-]
+import { getChatSessions, subscribeChatSessions } from '../_lib/chat'
+import ThemeToggle from './ThemeToggle'
 
 type ChatItemProps = {
   title: string
-  summary?: string
   isActive?: boolean
   href: string
+  onClick?: () => void
 }
 
-function ChatItem ({ title, isActive = false, href }: ChatItemProps) {
+function ChatItem ({ title, isActive = false, href, onClick }: ChatItemProps) {
   return (
-    <Link href={href}>
-      <li>
+    <li>
+      <Link href={href} onClick={onClick}>
         <div
           className={`
           flex w-full cursor-pointer items-center gap-3 rounded-md 
@@ -46,11 +31,10 @@ function ChatItem ({ title, isActive = false, href }: ChatItemProps) {
         >
           <span className='min-w-0'>
             <span className='block text-sm font-medium truncate'>{title}</span>
-            {/* <span className='block text-xs truncate text-zinc-500'>{summary}</span> */}
           </span>
         </div>
-      </li>
-    </Link>
+      </Link>
+    </li>
   )
 }
 
@@ -60,6 +44,8 @@ type SidebarContentProps = {
   onHeaderButtonClick: () => void
   toggleLabel: string
   toggleIcon?: 'menu' | 'close'
+  chats: Array<{ id: string, title: string }>
+  activePathname: string
 }
 
 function SidebarContent ({
@@ -68,6 +54,8 @@ function SidebarContent ({
   onHeaderButtonClick,
   toggleLabel,
   toggleIcon = 'menu',
+  chats,
+  activePathname,
 }: SidebarContentProps) {
   const ToggleIcon = toggleIcon === 'close' ? X : MenuIcon
 
@@ -120,12 +108,18 @@ function SidebarContent ({
             최근 대화
           </div>
           <ul className='space-y-1'>
+            {chats.length === 0 && (
+              <li className='px-3 py-2 text-sm text-app-subtle'>
+                저장된 대화가 없습니다
+              </li>
+            )}
             {chats.map((chat) => (
               <ChatItem
-                key={chat.title}
-                href={chat.href} // TODO: 채팅 상세 페이지 링크로 변경
+                key={chat.id}
+                href={`/chat/${chat.id}`}
                 title={chat.title}
-                isActive={chat.isActive}
+                isActive={activePathname === `/chat/${chat.id}`}
+                onClick={onNewChatClick}
               />
             ))}
           </ul>
@@ -138,8 +132,22 @@ function SidebarContent ({
 }
 
 export default function AppSidebar () {
+  const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [chats, setChats] = useState<Array<{ id: string, title: string }>>([])
+
+  useEffect(() => {
+    function syncChats () {
+      setChats(getChatSessions().map((session) => ({
+        id: session.id,
+        title: session.title,
+      })))
+    }
+
+    syncChats()
+    return subscribeChatSessions(syncChats)
+  }, [])
 
   const onClickCollapse = () => {
     setCollapsed((prev) => !prev)
@@ -186,6 +194,8 @@ export default function AppSidebar () {
           onHeaderButtonClick={closeMobileSidebar}
           toggleLabel='사이드바 닫기'
           toggleIcon='close'
+          chats={chats}
+          activePathname={pathname}
         />
       </nav>
 
@@ -198,6 +208,8 @@ export default function AppSidebar () {
           collapsed={collapsed}
           onHeaderButtonClick={onClickCollapse}
           toggleLabel={collapsed ? '사이드바 열기' : '사이드바 닫기'}
+          chats={chats}
+          activePathname={pathname}
         />
       </nav>
     </>
