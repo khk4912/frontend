@@ -1,8 +1,8 @@
 type UserChatProps = { text: string }
 export function UserChat ({ text }: UserChatProps) {
   return (
-    <div className='self-end px-4 py-2 text-white bg-blue-600 rounded-2xl'>
-      <span className='whitespace-pre-line wrap-break-word'>{text}</span>
+    <div className='max-w-[80%] self-end rounded-2xl bg-blue-600 px-4 py-2 text-white'>
+      <span className='whitespace-pre-line break-words'>{text}</span>
     </div>
   )
 }

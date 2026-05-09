@@ -12,6 +12,7 @@ export type ChatInputBoxHandle = {
 type ChatInputBoxProps = {
   onSend: (message: string) => void
   placeholder?: string
+  disabled?: boolean
   ref?: Ref<ChatInputBoxHandle>
 }
 
@@ -22,12 +23,13 @@ function normalizeMessage (message: string) {
 export default function ChatInputBox ({
   onSend,
   placeholder = '무엇이든 물어보세요',
+  disabled = false,
   ref,
 }: ChatInputBoxProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const [draft, setDraft] = useState('')
 
-  const canSend = normalizeMessage(draft).length > 0
+  const canSend = !disabled && normalizeMessage(draft).length > 0
 
   function setMessage (message: string) {
     if (editorRef.current === null) return
@@ -54,6 +56,8 @@ export default function ChatInputBox ({
   }
 
   function handleSend () {
+    if (disabled) return
+
     const content = normalizeMessage(draft)
     if (content.length === 0) return
 
@@ -88,9 +92,10 @@ export default function ChatInputBox ({
     <div className='flex items-center gap-3 rounded-4xl border border-app-border bg-panel px-5 py-3'>
       <div
         ref={editorRef}
-        contentEditable
+        contentEditable={!disabled}
         role='textbox'
         aria-label='채팅 메시지 입력'
+        aria-disabled={disabled}
         data-placeholder={placeholder}
         suppressContentEditableWarning
         onInput={(event) => setDraft(event.currentTarget.innerText)}

@@ -1,30 +1,270 @@
 'use client'
 
 import ChatInputBox from '@/app/_components/ChatInputBox'
+import {
+  createChatMessage,
+  getChatSession,
+  saveChatSession,
+  streamChat,
+  subscribeChatSessions,
+  toBackendHistory,
+} from '@/app/_lib/chat'
+import type { ChatMessage, ChatSession, ChatStreamEvent } from '@/app/_lib/chat'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+
 import { ChatView } from './_components/ChatView'
-import { UserChat } from './_components/UserChat'
 import { LLMChat } from './_components/LLMChat'
+import { UserChat } from './_components/UserChat'
+
+function updateSessionTimestamp (session: ChatSession): ChatSession {
+  return {
+    ...session,
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+function getErrorMessage (error: unknown) {
+  if (error instanceof Error) return error.message
+
+  return '답변 생성 중 오류가 발생했습니다.'
+}
+
+function getStateAnswer (patch: unknown) {
+  if (typeof patch !== 'object' || patch === null) return null
+
+  if ('answer_text' in patch && typeof patch.answer_text === 'string') {
+    return patch.answer_text
+  }
+
+  if (
+    'clarification_question' in patch &&
+    typeof patch.clarification_question === 'string'
+  ) {
+    return patch.clarification_question
+  }
+
+  return null
+}
 
 export default function ChatPage () {
+  const params = useParams<{ id: string }>()
+  const sessionId = params.id
+  const session = useSyncExternalStore(
+    subscribeChatSessions,
+    () => getChatSession(sessionId) ?? null,
+    () => null
+  )
+  const [isStreaming, setIsStreaming] = useState(false)
+  const streamedMessageIdsRef = useRef<Set<string>>(new Set())
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const persistSession = useCallback((nextSession: ChatSession) => {
+    saveChatSession(nextSession)
+  }, [])
+
+  const updateAssistantMessage = useCallback((
+    assistantId: string,
+    updater: (message: ChatMessage) => ChatMessage
+  ) => {
+    const currentSession = getChatSession(sessionId)
+
+    if (currentSession === undefined) return
+
+    const nextSession = updateSessionTimestamp({
+      ...currentSession,
+      messages: currentSession.messages.map((message) => (
+        message.id === assistantId ? updater(message) : message
+      ))
+    })
+
+    saveChatSession(nextSession)
+  }, [sessionId])
+
+  const startAssistantResponse = useCallback(async (
+    userMessage: ChatMessage,
+    requestMessages: ChatMessage[]
+  ) => {
+    if (streamedMessageIdsRef.current.has(userMessage.id)) return
+
+    streamedMessageIdsRef.current.add(userMessage.id)
+    abortControllerRef.current?.abort()
+
+    const abortController = new AbortController()
+    const assistantMessage = createChatMessage('assistant', '', 'streaming')
+    const sessionBeforeRequest = getChatSession(sessionId)
+
+    if (sessionBeforeRequest === undefined) return
+
+    persistSession(updateSessionTimestamp({
+      ...sessionBeforeRequest,
+      messages: [...requestMessages, assistantMessage]
+    }))
+    setIsStreaming(true)
+    abortControllerRef.current = abortController
+
+    try {
+      await streamChat({
+        sessionId,
+        userQuery: userMessage.content,
+        history: toBackendHistory(
+          requestMessages.filter((message) => message.id !== userMessage.id)
+        ),
+        signal: abortController.signal,
+        onEvent: (event: ChatStreamEvent) => {
+          if (event.type === 'token') {
+            updateAssistantMessage(assistantMessage.id, (message) => ({
+              ...message,
+              content: `${message.content}${event.data.text ?? ''}`
+            }))
+          }
+
+          if (event.type === 'error') {
+            updateAssistantMessage(assistantMessage.id, (message) => ({
+              ...message,
+              status: 'error',
+              error: event.data.message ?? '답변 생성 중 오류가 발생했습니다.'
+            }))
+          }
+
+          if (event.type === 'state') {
+            const stateAnswer = getStateAnswer(event.data.patch)
+
+            if (stateAnswer !== null) {
+              updateAssistantMessage(assistantMessage.id, (message) => ({
+                ...message,
+                content: stateAnswer
+              }))
+            }
+          }
+
+          if (event.type === 'done') {
+            updateAssistantMessage(assistantMessage.id, (message) => ({
+              ...message,
+              status: undefined
+            }))
+          }
+        }
+      })
+    } catch (error) {
+      if (abortController.signal.aborted) return
+
+      const message = getErrorMessage(error)
+
+      updateAssistantMessage(assistantMessage.id, (currentMessage) => ({
+        ...currentMessage,
+        content: currentMessage.content.length > 0 ? currentMessage.content : message,
+        status: 'error',
+        error: message
+      }))
+    } finally {
+      if (!abortController.signal.aborted) {
+        setIsStreaming(false)
+      }
+    }
+  }, [persistSession, sessionId, updateAssistantMessage])
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (session === null || isStreaming) return
+
+    const lastMessage = session.messages.at(-1)
+
+    if (lastMessage?.role === 'user') {
+      const timeoutId = window.setTimeout(() => {
+        startAssistantResponse(lastMessage, session.messages).catch(() => {})
+      }, 0)
+
+      return () => window.clearTimeout(timeoutId)
+    }
+  }, [isStreaming, session, startAssistantResponse])
+
+  function handleSend (message: string) {
+    if (session === null || isStreaming) return
+
+    const userMessage = createChatMessage('user', message)
+    const nextSession = updateSessionTimestamp({
+      ...session,
+      messages: [...session.messages, userMessage]
+    })
+
+    persistSession(nextSession)
+    startAssistantResponse(userMessage, nextSession.messages).catch(() => {})
+  }
+
+  function handleRetry (assistantMessage: ChatMessage) {
+    if (session === null || isStreaming) return
+
+    const assistantIndex = session.messages.findIndex((message) => (
+      message.id === assistantMessage.id
+    ))
+    const previousUserMessage = [...session.messages]
+      .slice(0, assistantIndex)
+      .reverse()
+      .find((message) => message.role === 'user')
+
+    if (previousUserMessage === undefined) return
+
+    streamedMessageIdsRef.current.delete(previousUserMessage.id)
+
+    const requestMessages = session.messages
+      .slice(0, assistantIndex)
+      .filter((message) => message.id !== assistantMessage.id)
+    const nextSession = updateSessionTimestamp({
+      ...session,
+      messages: requestMessages
+    })
+
+    persistSession(nextSession)
+    startAssistantResponse(previousUserMessage, requestMessages).catch(() => {})
+  }
+
+  if (session === null) {
+    return (
+      <main className='flex flex-1 flex-col items-center justify-center gap-4 bg-app-bg px-6 text-center text-app-text'>
+        <p className='text-lg font-semibold'>대화를 찾을 수 없습니다.</p>
+        <Link
+          href='/'
+          className='rounded-md bg-action px-4 py-2 text-sm font-semibold text-action-text hover:bg-action-hover'
+        >
+          새 채팅 시작
+        </Link>
+      </main>
+    )
+  }
+
   return (
-    <main className='flex flex-col flex-1 overflow-hidden text-app-text bg-app-bg'>
+    <main className='flex flex-1 flex-col overflow-hidden bg-app-bg text-app-text'>
       <ChatView>
-        <UserChat text='안녕?' />
-        <LLMChat text='안녕하세요! 무엇을 도와드릴까요?' />
-        <UserChat text='넌 무엇을 할 수 있니?' />
-        <LLMChat text='저는 교통사고 관련 질문에 답변해드릴 수 있어요. 과실비율, 합의금 계산, 사고 처리 절차 등 궁금한 점이 있으면 무엇이든 저에게 물어보세요!' />
-        <UserChat text='교통사고 과실비율이 뭐야?' />
-        <LLMChat text='과실비율은 교통사고에서 각 당사자의 책임 정도를 백분율로 나타낸 것입니다. 예를 들어, A와 B가 사고를 냈을 때 A의 과실이 70%이고 B의 과실이 30%라면, A는 사고에 대한 책임이 더 크다는 것을 의미합니다. 과실비율은 사고 상황, 증거, 목격자 진술 등을 종합적으로 고려하여 결정됩니다.' />
-        <UserChat text='그럼 합의금 계산은 어떻게 해?' />
-        <LLMChat text={'합의금 계산은 여러 요소에 따라 달라질 수 있지만, 일반적으로 다음과 같은 요소들이 고려됩니다: \n\n 1. 치료비: 사고로 인한 의료비용\n2. 휴업 손실: 사고로 인해 일을 못하게 된 기간 동안의 소득 손실\n3. 위자료: 정신적 고통에 대한 보상\n4. 재산 피해: 차량 수리비 등 물적 피해 비용\n5. 과실비율: 각 당사자의 책임 정도에 따라 합의금이 조정될 수 있습니다.\n\n정확한 합의금 계산을 위해서는 사고 상황과 관련된 모든 정보를 종합적으로 검토하는 것이 중요합니다.'} />
-        <UserChat text='나는 오늘 직진 중에 오른쪽에서 갑자기 나타난 차에 부딪혔어. 이런 경우엔 과실 비율이 어떻게 될까?' />
-        <LLMChat text='이런 경우에는 일반적으로 직진하던 차량이 우회전하던 차량보다 과실이 적게 나오는 경향이 있습니다. 하지만 정확한 과실비율은 사고 상황에 따라 달라질 수 있습니다. 예를 들어, 우회전하던 차량이 신호를 무시하거나 과속을 했는지, 직진하던 차량이 안전거리를 유지했는지 등의 요소들이 고려됩니다. 일반적으로는 직진하던 차량이 80%의 과실을 받고, 우회전하던 차량이 20%의 과실을 받는 경우가 많지만, 이는 단순한 예시일 뿐 실제 사고에서는 다양한 요소들이 영향을 미칠 수 있습니다.' />
-        <UserChat text='그럼 합의금은 어떻게 될까?' />
-        <LLMChat text='합의금은 과실비율과 사고로 인한 피해 정도에 따라 달라질 수 있습니다. 예를 들어, 직진하던 차량이 80%의 과실을 받고, 우회전하던 차량이 20%의 과실을 받는 경우, 직진하던 차량이 입은 피해가 1,000만원이라면, 직진하던 차량은 800만원의 합의금을 받을 수 있고, 우회전하던 차량은 200만원의 합의금을 받을 수 있습니다. 하지만 실제 합의금 계산은 치료비, 휴업 손실, 위자료, 재산 피해 등 다양한 요소들을 종합적으로 고려하여 결정되므로, 정확한 합의금 금액을 예측하기는 어렵습니다.' />
+        {session.messages.map((message) => (
+          message.role === 'user'
+            ? (
+              <UserChat key={message.id} text={message.content} />
+              )
+            : (
+              <LLMChat
+                key={message.id}
+                text={message.content}
+                isStreaming={message.status === 'streaming'}
+                isError={message.status === 'error'}
+                onRetry={() => handleRetry(message)}
+              />
+              )
+        ))}
       </ChatView>
 
       <div className='w-full max-w-3xl px-6 pb-6 mx-auto shrink-0'>
-        <ChatInputBox onSend={() => { console.log('send') }} />
+        <ChatInputBox
+          disabled={isStreaming}
+          onSend={handleSend}
+          placeholder={isStreaming ? '답변을 기다리는 중입니다' : '이어서 질문해보세요'}
+        />
       </div>
     </main>
   )
