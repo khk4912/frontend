@@ -25,7 +25,7 @@ import { ChatView } from './_components/ChatView'
 import { LLMChat } from './_components/LLMChat'
 import { UserChat } from './_components/UserChat'
 
-const CHAT_STREAM_TIMEOUT_MS = 10000
+const CHAT_STREAM_TIMEOUT_MS = 450000
 const CHAT_STREAM_TIMEOUT_MESSAGE = '응답 시간이 초과되었습니다. 다시 시도해주세요.'
 
 function updateSessionTimestamp (session: ChatSession): ChatSession {
