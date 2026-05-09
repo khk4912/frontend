@@ -298,7 +298,7 @@ export function LLMChat ({
   }
 
   return (
-    <div className='flex max-w-[88%] flex-col self-start py-2'>
+    <div className='flex flex-col self-start py-2'>
       {isStreaming && !hasText
         ? (
           <ProgressStatus label={statusText} />
