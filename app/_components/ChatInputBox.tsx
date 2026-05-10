@@ -73,6 +73,22 @@ export default function ChatInputBox ({
     handleSend()
   }
 
+  function handlePaste (event: React.ClipboardEvent<HTMLDivElement>) {
+    event.preventDefault()
+    const text = event.clipboardData.getData('text/plain')
+
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+
+    const range = selection.getRangeAt(0)
+    range.deleteContents()
+    range.insertNode(document.createTextNode(text))
+    range.collapse(false)
+
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
+
   function handleBlur () {
     const editor = editorRef.current
     if (editor === null) return
@@ -100,6 +116,7 @@ export default function ChatInputBox ({
         suppressContentEditableWarning
         onInput={(event) => setDraft(event.currentTarget.innerText)}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         onBlur={handleBlur}
         className='min-h-10 max-h-40 flex-1 overflow-y-auto whitespace-pre-wrap break-words py-1.5 text-base leading-7 text-app-text outline-none empty:before:pointer-events-none empty:before:text-app-subtle empty:before:content-[attr(data-placeholder)]'
       />
