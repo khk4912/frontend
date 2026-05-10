@@ -272,6 +272,7 @@ export function LLMChat ({
     hr: () => (
       <hr className='my-5 border-app-border' />
     ),
+    del: ({ children }) => <>{children}</>,
     a: ({ href, children }) => {
       if (href?.startsWith('citation:') === true) {
         const markerIdx = Number(href.slice('citation:'.length))
