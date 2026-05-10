@@ -9,11 +9,12 @@ import type { ChatInputBoxHandle } from './ChatInputBox'
 import PromptChip from './PromptChip'
 
 const promptSuggestions = [
-  '과실비율이 뭔가요?',
-  '합의금은 어떻게 정해지나요?',
-  '우회전하던 차와 부딪혔는데 과실비율은 어떻게 되나요?',
-  '교통사고 합의금 계산 방법을 알려주세요.',
+  '스쿨존에서의 사고 시 과실비율이 더 높아질까요?',
+  '교통사고의 합의금은 어떻게 정해지나요?',
   '교통사고 과실비율은 어떻게 결정되나요?',
+  '우회전하던 차와 부딪혔는데 과실비율은 어떻게 되나요?',
+  '뺑소니를 당했어요. 어떻게 대처해야 할까요?',
+  '교통사고로 인한 후유증도 보상받을 수 있을까요?',
 ]
 
 export default function StartChat () {
