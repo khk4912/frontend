@@ -9,6 +9,24 @@ import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
+function remarkNoStrikethrough () {
+  return (tree: { type: string; children?: unknown[]; value?: string }) => {
+    function visit (node: { type: string; children?: unknown[]; value?: string }): void {
+      if (!Array.isArray(node.children)) return
+
+      node.children = node.children.flatMap((child) => {
+        const c = child as { type: string; children?: unknown[]; value?: string }
+        if (c.type === 'delete') {
+          return c.children ?? []
+        }
+        visit(c)
+        return [c]
+      })
+    }
+    visit(tree)
+  }
+}
+
 const CITATION_TOOLTIP_WIDTH = 320
 const CITATION_TOOLTIP_GAP = 8
 const CITATION_TOOLTIP_MARGIN = 12
@@ -272,7 +290,6 @@ export function LLMChat ({
     hr: () => (
       <hr className='my-5 border-app-border' />
     ),
-    del: ({ children }) => <>{children}</>,
     a: ({ href, children }) => {
       if (href?.startsWith('citation:') === true) {
         const markerIdx = Number(href.slice('citation:'.length))
@@ -309,7 +326,7 @@ export function LLMChat ({
             {hasText
               ? (
                 <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
+                  remarkPlugins={[remarkGfm, remarkNoStrikethrough]}
                   components={markdownComponents}
                   urlTransform={transformMarkdownUrl}
                 >
