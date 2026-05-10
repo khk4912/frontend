@@ -82,7 +82,7 @@ let cachedStorageValue: string | null | undefined
 let cachedChatSessions: ChatSession[] = EMPTY_CHAT_SESSIONS
 
 const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api'
 ).replace(/\/$/, '')
 
 export function createId () {

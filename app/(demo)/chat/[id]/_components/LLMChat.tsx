@@ -1,7 +1,7 @@
 'use client'
 
 import type { Citation, RetrievedDoc } from '@/app/_lib/chat'
-import { LucideCopy, RefreshCwIcon, Share2Icon } from 'lucide-react'
+import { LucideCopy, RefreshCwIcon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { defaultUrlTransform } from 'react-markdown'
