@@ -22,6 +22,9 @@ try {
 export const metadata: Metadata = {
   title: '교톡',
   description: '교통사고 과실비율, 합의금은 이제 교톡에서!',
+  icons: {
+    icon: '/logo.png',
+  }
 
 }
 
