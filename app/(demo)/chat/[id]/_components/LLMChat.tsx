@@ -325,8 +325,15 @@ export function LLMChat ({
       )}
       {(hasText || isError) && (
         <div className='flex justify-start mt-2 -ml-2'>
-          <ToolButton label='답변 복사' icon={<LucideCopy size={16} />} />
-          <ToolButton label='답변 공유' icon={<Share2Icon size={16} />} />
+          <ToolButton
+            label='답변 복사' icon={<LucideCopy size={16} />}
+            onClick={
+              () => {
+                navigator.clipboard.writeText(text)
+                  .catch(console.error)
+              }
+            }
+          />
           <ToolButton
             label={isError ? '답변 재시도' : '답변 다시 생성'}
             icon={<RefreshCwIcon size={16} />}
