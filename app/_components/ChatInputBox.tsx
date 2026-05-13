@@ -27,6 +27,7 @@ export default function ChatInputBox ({
   ref,
 }: ChatInputBoxProps) {
   const editorRef = useRef<HTMLDivElement>(null)
+  const isComposingRef = useRef(false)
   const [draft, setDraft] = useState('')
 
   const canSend = !disabled && normalizeMessage(draft).length > 0
@@ -68,6 +69,11 @@ export default function ChatInputBox ({
 
   function handleKeyDown (event: KeyboardEvent<HTMLDivElement>) {
     if (event.key !== 'Enter' || event.shiftKey) return
+    if (
+      isComposingRef.current ||
+      event.nativeEvent.isComposing ||
+      event.nativeEvent.keyCode === 229
+    ) return
 
     event.preventDefault()
     handleSend()
@@ -114,6 +120,12 @@ export default function ChatInputBox ({
         aria-disabled={disabled}
         data-placeholder={placeholder}
         suppressContentEditableWarning
+        onCompositionStart={() => {
+          isComposingRef.current = true
+        }}
+        onCompositionEnd={() => {
+          isComposingRef.current = false
+        }}
         onInput={(event) => setDraft(event.currentTarget.innerText)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
